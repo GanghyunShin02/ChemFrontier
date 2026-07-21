@@ -13,7 +13,7 @@ Refer to :
 
 [1]Ryan O'Hayre,Suk-Won Cha, Whitney Colella,Fritz B.Prinz,Hanteemedia (2008) $\textit{\langle FUEL CELL Fundamentals\rangle}$, Korean Trans(Suk-Won Cha Trans.,),Hantee media
 
-[2]Frano Barbir (2005), $\textit{\langle PEM FUel Cells -Theory and Practice-\rangle}$ ,Korean Trans(Young-Ill Cho, Kee-Suk Cha),Bookshill
+[2]Frano Barbir (2005), $\textit{\langle PEM Fuel Cells -Theory and Practice-\rangle}$ ,Korean Trans(Young-Ill Cho, Kee-Suk Cha),Bookshill
 
 ---
 
@@ -53,9 +53,11 @@ Use thin memebrane to electrolyte. Proton rolls on carry charge.
 
 #### Step 1 Mass transfer to fuelcell inner
 
-For operate fuel cell well, Fuel and Oxidation must input sufficently.
-Use flow field plate for efficent on Reactant transport.
-Good flow field plate has good channel and groove for diffusion gas.
+- For operate fuel cell well, Fuel and Oxidation must input sufficently.
+
+- Use flow field plate for efficent on Reactant transport.
+
+- Good flow field plate has good channel and groove for diffusion gas.
 
 ---
 
@@ -197,6 +199,8 @@ $$
    
 $$
    \frac{\partial}{\partial t}(C_i)+\nabla \cdot (uC_i)-\nabla \cdot (D_{eff} \nabla C_i)=Gen $$
+
+---
 
 4. Energy conservation
 
