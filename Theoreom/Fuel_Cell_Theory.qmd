@@ -1,0 +1,358 @@
+---
+title: Fuel Cell Theory
+format:
+  revealjs:
+    theme: default
+    embed-resources: true
+---
+
+# Fuel Cell Theory and Flooding
+
+Refer to:
+
+[1] Ryan O'Hayre, Suk-Won Cha, Whitney Colella, Fritz B. Prinz, *Fuel Cell Fundamentals*, Hanteemedia Korean Translation (2008)
+
+[2] Frano Barbir, *PEM Fuel Cells: Theory and Practice*, Bookshill Korean Translation (2005)
+
+---
+
+## Hydrogen Combustion Reaction
+
+**Anode**
+
+$$
+H_2 \rightarrow 2H^{+}+2e^{-}
+$$
+
+**Cathode**
+
+$$
+\frac{1}{2} O_2+2H^{+}+2e^{-}\rightarrow H_2O
+$$
+
+---
+
+## PEMFC
+
+![Fuelcellmap](images/Fuelcellmap.png){width=50%}
+
+**PEMFC**: Polymer Electrolyte Membrane Fuel Cell
+
+A thin polymer membrane is used as the electrolyte.
+Protons carry charge through the membrane.
+
+---
+
+## Fuel Cell Operation
+
+1. Mass transport of reactants into the fuel cell
+2. Electrochemical reactions
+3. Proton transport through the electrolyte and electron transport through the external circuit
+4. Removal of reaction products
+
+---
+
+### Step 1. Mass Transport
+
+- Sufficient fuel and oxidant must be supplied for efficient operation.
+- Flow field plates improve reactant transport.
+- Well-designed flow channels enhance gas diffusion.
+
+---
+
+### Step 2. Electrochemical Reactions
+
+Electrochemical reactions occur when the reactants reach the catalyst layer.
+
+This process is one of the major factors determining fuel cell performance.
+
+---
+
+### Step 3. Proton and Electron Transport
+
+To maintain charge balance, protons move through the electrolyte while electrons flow through the external circuit.
+
+---
+
+### Step 4. Water Removal
+
+Water is generated as a reaction product.
+
+In PEM fuel cells, excessive water accumulation causes flooding, which degrades cell performance.
+
+---
+
+## Fuel Cell Performance
+
+Major voltage losses include
+
+- Activation loss
+- Ohmic loss
+- Concentration loss
+
+Therefore,
+
+$$
+V=E_{thermo}-\eta_{act}-\eta_{ohmic}-\eta_{conc}
+$$
+
+---
+
+## Nernst Equation
+
+Electrical energy is
+
+$$
+W=EQ
+$$
+
+where $E$ is the cell voltage and $Q$ is the electric charge.
+
+Since
+
+$$
+Q=nF,
+$$
+
+we obtain
+
+$$
+W=nFE.
+$$
+
+Because
+
+$$
+-\Delta G=W,
+$$
+
+$$
+\Delta G=-nF\Delta E.
+$$
+
+---
+
+### Effect of Temperature
+
+At constant pressure,
+
+$$
+dG=Vdp-SdT
+$$
+
+$$
+\left(\frac{dG}{dT}\right)_P=-S
+$$
+
+Using
+
+$$
+\Delta G=-nF\Delta E,
+$$
+
+$$
+\left(\frac{dE}{dT}\right)_P=\frac{\Delta S}{nF}
+$$
+
+$$
+E_T=E^0+\frac{\Delta S}{nF}(T-T_0)
+$$
+
+---
+
+### Effect of Concentration
+
+The chemical potential is
+
+$$
+\mu_i^\alpha=\left(\frac{\partial G}{\partial n_i}\right)_{T,P}.
+$$
+
+The chemical potential can be written as
+
+$$
+\mu_i=\mu_i^0+RT\ln a_i,
+$$
+
+where $a_i$ is the activity.
+
+---
+
+Example reaction
+
+$$
+A+bB\rightarrow mM+nN
+$$
+
+$$
+\Delta G=\Delta G^0+RT\ln\frac{a_M^m a_N^n}{a_Aa_B^b}
+$$
+
+$$
+\Delta E=\Delta E^0-\frac{RT}{nF}\ln\frac{a_M^m a_N^n}{a_Aa_B^b}
+$$
+
+---
+
+In general,
+
+$$
+\Delta E=\Delta E^0-\frac{RT}{nF}\ln\frac{\prod a_{products}^{\nu_i}}{\prod a_{reactants}^{\nu_i}}
+$$
+
+---
+
+## Butler–Volmer Equation
+
+The Butler–Volmer equation describes the relationship between current density and overpotential.
+
+$$
+j_1=j_0\exp(\alpha nF\eta/RT)
+$$
+
+$$
+j_2=j_0\exp(-(1-\alpha)nF\eta/RT)
+$$
+
+$$
+j=j_0\left[\exp(-(1-\alpha)nF\eta/RT)-\exp(\alpha nF\eta/RT)\right]
+$$
+
+- $j_0$: Exchange current density
+- $\alpha$: Charge transfer coefficient
+- $\eta$: Overpotential
+
+---
+
+## Governing Equations I {.smaller}
+
+### 1. Mass Conservation
+
+$$
+\frac{\partial \rho}{\partial t}
++
+\nabla\cdot(\rho\mathbf{u})
+=0
+$$
+
+- $\rho$: Fluid density
+- $\mathbf{u}$: Fluid velocity
+
+### 2. Momentum Conservation
+
+Brinkman equation:
+
+$$
+\frac{\partial(\rho\mathbf{u})}{\partial t}
++
+\rho(\mathbf{u}\cdot\nabla)\mathbf{u}
+=
+-\nabla P
++
+\nabla\cdot
+\left[
+\mu
+\left(
+\nabla\mathbf{u}
++
+\nabla\mathbf{u}^{T}
+\right)
+\right]
+-
+\frac{\mu}{\kappa}\mathbf{u}
+$$
+
+- $P$: Pressure
+- $\mu$: Dynamic viscosity
+- $\kappa$: Permeability
+
+---
+
+## Governing Equations II {.smaller}
+
+### 3. Species Conservation
+
+$$
+\frac{\partial C_i}{\partial t}
++
+\nabla\cdot(\mathbf{u}C_i)
+=
+\nabla\cdot
+\left(
+D_{i,\mathrm{eff}}\nabla C_i
+\right)
++
+S_i
+$$
+
+- $C_i$: Concentration of species $i$
+- $D_{i,\mathrm{eff}}$: Effective diffusivity
+- $S_i$: Species source term
+
+### 4. Energy Conservation
+
+$$
+(\rho c_p)_{\mathrm{eff}}
+\frac{\partial T}{\partial t}
++
+(\rho c_p)_{\mathrm{eff}}
+\mathbf{u}\cdot\nabla T
+=
+\nabla\cdot
+\left(
+k_{\mathrm{eff}}\nabla T
+\right)
++
+S_T
+$$
+
+- $T$: Temperature
+- $k_{\mathrm{eff}}$: Effective thermal conductivity
+- $S_T$: Heat source term
+
+---
+
+## Governing Equations III {.smaller}
+
+### 5. Charge Conservation
+
+Electronic phase:
+
+$$
+\nabla\cdot\mathbf{i}_{e}=-j
+$$
+
+Ionic phase:
+
+$$
+\nabla\cdot\mathbf{i}_{ion}=j
+$$
+
+- $\mathbf{i}_{e}$: Electronic current density
+- $\mathbf{i}_{ion}$: Ionic current density
+- $j$: Volumetric reaction current density
+
+### 6. Electrochemical Reaction
+
+Butler--Volmer equation:
+
+$$
+j
+=
+j_0
+\left[
+\exp
+\left(
+\frac{\alpha_a nF\eta}{RT}
+\right)
+-
+\exp
+\left(
+-\frac{\alpha_c nF\eta}{RT}
+\right)
+\right]
+$$
+
+- $j_0$: Exchange current density
+- $\eta$: Activation overpotential
+- $\alpha_a,\alpha_c$: Charge-transfer coefficients
