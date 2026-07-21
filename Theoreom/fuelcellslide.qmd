@@ -33,7 +33,7 @@ $$
 
 ## PEMFC
 
-![Fuelcellmap](images/Fuelcellmap.png){width=1%}
+![Fuelcellmap](images/Fuelcellmap.png){width=50%}
 
 PEMFC:Polymer Electrolyte Membrane Fuel Cell
 
