@@ -21,6 +21,8 @@ $$
 
 ## PEMFC
 
+![Fuelcellmap](images/Fuelcellmap.png)
+
 PEMFC:Polymer Electrolyte Membrane Fuel Cell
 
 Use thin memebrane to electrolyte. Proton rolls on carry charge.
