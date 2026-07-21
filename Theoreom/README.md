@@ -41,7 +41,155 @@ For operate fuel cell well, Fuel and Oxidation must input sufficently.
 Use flow field plate for efficent on Reactant transport.
 Good flow field plate has good channel and groove for diffusion gas.
 
-#### Step 2
+#### Step 2 Electro - Chemical reaction
+
+When reactant arrive on electrode reaction goes on.
+
+Biggest limits on design battery.
+
+#### Step 3 Ion and electrone transfer
+
+For charge balace, ion and electrone move.
+
+#### Step 4 Byproduct release
+
+Fuel cell make byproduct.
+
+In case of hydrogen fuel cell, byproduct is water.
+
+Flooding by water makes 
+
+## Fuel cell perfomance
+
+loss of fuel cell :
+* activation loss : loss of chemical reaction
+* ohmic loss : loss of conductivity
+* concentration loss : loss of mass transfer
+
+So fuel cell's real voltage is
+
+$$
+V=E_{thermo}-\eta_{act}-\eta_{ohmic}-\eta_{conc} $$
+
+
+## Nernst equation
+
+Electrone energy out like $W=EQ$, E is volatage(V;J/C), Q is charge(C)
+
+Use Fareday constant $F$, $N_A$ s electrone's charge, $Q=nF$
+
+$W=nF E$ System's free energy $-\Delta G=W$, $\Delta G=-nF\Delta E$
+
+#### voltage by temperature
+
+$dG=Vdp-SdT$  Constant pressure
+
+$$
+(\frac{dG}{dT})_P =-S $$
+
+$$
+\Delta G=-nF\Delta E, (\frac{dE}{dT})_P=\frac{S}{nF} $$
+
+$$
+E_T=E^0+\frac{\Delta S}{nF}(T-T_0) $$
+
+#### voltage by concentrate
+
+Chemical potential $\mu^{\alpha}_i=(\frac{\partial G}{\partial n_i}) _{T,P}$
+$\mu^{\alpha}_i$ is specise $i$'s chmical potential at phase $\alpha$.
+So $dG=\sum_i \mu_i dn_i$
+
+
+$\mu=\mu^0 _i +RT\ln a_i$, $a_i$ is activity. Effective concentrate.
+
+Example reaction:
+
+$$
+A+bB \rightarrow mM+nN $$
+
+$$
+\Delta G= m{\mu^0_M+RT\ln a_M}+n{\mu^0_N+RT\ln a_N}-{\mu^0_A+RT\ln a_A}-b{\mu^0_B+RT\ln a_B} $$
+
+$$
+\Delta G={m\mu^0_M+n\mu^0_N-\mu^0_A-b\mu^0_B}+RT \ln \frac{a^m_M a^n_N}{a_A a^b_B} $$
+
+$$
+\Delta G=\Delta G^0 +RT \ln \frac{a^m_M a^n_N}{a_A a^b_B} $$
+
+$$
+\Delta E=\Delta E^0-\frac{RT}{nF}\ln \frac{a^m_M a^n_N}{a_A a^b_B} $$
+
+Generalize log term,
+
+$$
+\Delta E=\Delta E^0-\frac{RT}{nF}\ln \frac{\Pi a^{\nu_i}_{products}}{\Pi a^{\nu_i} _{reactans}} $$
+
+## Bulter Volmer equation
+
+This equation is about current density change.
+
+$$
+j_1=j_0\exp (\alpha n F \eta /RT) $$
+
+$$
+j_2=j_0 \exp(-(1-\alpha)nF\eta /RT) $$
+
+Fure current density 
+
+$$
+j=j_0(\exp(-(1-\alpha)nF\eta /RT)-\exp (\alpha n F \eta /RT)) $$
+
+- Equilibrium current density $j_0$
+- $\alpha$ is transfer coffiecent
+-  $\eta$ is Overpotential
+
+
+## Governing equation
+
+1. Mass conservation
+
+$$
+   \frac{\partial}{\partial t}  \rho +\nabla \cdot ( \rho u) =0 $$
+
+2. Momentum conservation; Brinkman equation
+   
+$$
+   \frac{\partial(\rho u)}{\partial t} +\rho (u \cdot \nabla )u=-\nabla P +\nabla(\mu \nabla u) -\frac{\mu}{\kappa}u $$
+
+3. Species conservation
+   
+$$
+   \frac{\partial}{\partial t}(C_i)+\nabla \cdot (uC_i)-\nabla \cdot (D_{eff} \nabla C_i)=Gen $$
+
+4. Energy conservation
+
+$$
+   (\rho c_p)_ {eff}  \frac{\partial T}{\partial t} +(\rho c_p)_ {eff}(u \cdot \nabla T)=\nabla \cdot (k_ {eff} \nabla T)+S_e $$
+
+5. Charge conservation
+
+$$
+   \nabla \cdot i_ {electrone} = -\nabla \cdot i_ {ion} =j $$
+
+6. Electrochemical reaction
+
+$$
+    j=j_0(\exp(-(1-\alpha)nF\eta /RT)-\exp (\alpha n F \eta /RT)) $$
+   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
