@@ -26,3 +26,24 @@ $$
 PEMFC:Polymer Electrolyte Membrane Fuel Cell
 
 Use thin memebrane to electrolyte. Proton rolls on carry charge.
+
+### Fuel Cell step
+
+1. Mass transfer to fuel cell inner.
+2. Electro-chemical reaction
+3. Ion transport on electrolyte and electrone transpot on outer cycle.
+4. Byproduct remove
+
+
+#### Step 1 Mass transfer to fuelcell inner
+
+For operate fuel cell well, Fuel and Oxidation must input sufficently.
+Use flow field plate for efficent on Reactant transport.
+Good flow field plate has good channel and groove for diffusion gas.
+
+#### Step 2
+
+
+
+
+
