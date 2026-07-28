@@ -31,6 +31,19 @@ $$
 $$
 -\nabla \cdot (\sum_k C^{\alpha} _k j_k) $$
 
+...
+
+
+## Proof momentum valace
+
+Because of stedady state,
+
+$$
+(u \cdot)\nabla u =-\nabla P + \nu \nabla ^2 u +f $$
+
+
+
+
 
 
 
