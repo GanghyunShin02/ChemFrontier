@@ -60,7 +60,7 @@ with XDMFFile(MPI.COMM_WORLD, "cathode_domain.xdmf", "w") as xdmf:
 # Constants
 T   = Constant(domain, default_scalar_type(353))
 Pc  = Constant(domain, default_scalar_type(1.013*10**5))
-R   = Constant(domain, default_scalar_type(80.14))
+R   = Constant(domain, default_scalar_type(8.314))
 F   = Constant(domain, default_scalar_type(96487))
 
 MO2      = Constant(domain, default_scalar_type(0.032))
@@ -69,6 +69,7 @@ DgO2     = Constant(domain, default_scalar_type(1.805*10**-5))
 alp      = Constant(domain, default_scalar_type(0.5))
 rhowater = Constant(domain, default_scalar_type(974.85))
 nuwater  = Constant(domain, default_scalar_type(3.65*10**-7))
+muwater = Constant(domain, default_scalar_type(3.558e-4))
 K        = Constant(domain, default_scalar_type(5*10**-13))
 sigma    = Constant(domain, default_scalar_type(0.0625))
 alpc     = Constant(domain, default_scalar_type(1))
@@ -163,7 +164,9 @@ problem = NonlinearProblem(
 
 problem.solve()
 converged_reason = problem.solver.getConvergedReason()
-print(f"Converged reason: {converged_reason}")
+
+if MPI.COMM_WORLD.rank==0:
+    print(f"Converged reason: {converged_reason}")
 
 from dolfinx.io import VTXWriter
 
@@ -186,7 +189,11 @@ with VTXWriter(domain.comm, "/home/ss/ChemFrontier/results/pressure13.bp", [p_so
 # 종보존 (포화도 s + 산소농도 C) — u_sol, p_sol 계산 직후부터 이어짐
 # ============================================================
 
-I_curr = Constant(domain, default_scalar_type(14000))   # A/m^2, 고정 전류밀도
+#임의로...
+I_ref = Constant(domain, default_scalar_type(100))   # A/m^2, 고정 전류밀도
+eta=Constant(domain,default_scalar_type(0.05)) # 임의의 수치... 
+V_oc=Constant(domain,default_scalar_type(1.2)) # 표준환원전위
+
 Pv_sat = Constant(domain, default_scalar_type(47400))   # Pa, 353K 물 포화증기압
 Mair   = Constant(domain, default_scalar_type(0.029))   # kg/mol
 
@@ -199,8 +206,26 @@ P_C = basix.ufl.element("Lagrange", domain.basix_cell(), 1)
 SC  = basix.ufl.mixed_element([P_s, P_C])
 W2  = functionspace(domain, SC)
 
-S_space, _ = W2.sub(0).collapse()
-C_space, _ = W2.sub(1).collapse()
+WI=functionspace(domain,("Lagrange",1))
+
+
+S_space, S_to_W2 = W2.sub(0).collapse()
+C_space, C_to_W2 = W2.sub(1).collapse()
+
+lb = Function(W2)
+ub = Function(W2)
+lb.x.array[:] = -PETSc.INFINITY
+ub.x.array[:] =  PETSc.INFINITY
+
+lb.x.array[S_to_W2] = 0.0
+ub.x.array[S_to_W2] = 1.0
+lb.x.array[C_to_W2] = 0.0
+ub.x.array[C_to_W2] = 1.0   
+
+
+lb.x.scatter_forward()
+ub.x.scatter_forward()
+
 
 # ---- BC (theta 무관, 한 번만) ----
 inlet_C_dofs = locate_dofs_topological((W2.sub(1), C_space), fdim, inlettag)
@@ -215,10 +240,11 @@ bcs_interface = dirichletbc(s_zero, interface_s_dofs, W2.sub(0))
 
 bcsO2 = [bcO2_inlet, bcs_interface]
 
+
 # ---- theta별 반복 계산 ----
 results = {}
 
-for theta in [91, 100, 110, 120]:
+for theta in [91]:
     theta_rad = np.deg2rad(theta)
 
     sc = Function(W2)
@@ -238,18 +264,173 @@ for theta in [91, 100, 110, 120]:
 
     rv_ratio  = (Pv_sat*MH2O) / (Pc*Mair)          # 식(21)
     gamma_H2O = lambda_l + lambda_g*rv_ratio        # 식(24)
-    gamma_O2  = 1.0                                 # 산소는 액상에 안 녹음 (식28)
+    gamma_O2  = lambda_g                                 # 산소는 액상에 안 녹음 (식28)
 
     dJds  = 1.417 - 4.24*s + 3.789*s**2             # dJ(s)/ds
     D_cap = (K*lambda_l*lambda_g/nu_mix) * sigma*np.cos(theta_rad) * (epsilon/K)**0.5 * dJds
+
+    DO2=epsilon*(1-s)*DgO2
+
 
     # ---- C_H2O를 s의 대수함수로 계산 (식 6, 21, 22) ----
     rho_mix = rhowater*s + rhoAir*(1-s)             # 식(5)
     C_H2O   = (rhowater*s + rhoAir*(1-s)*rv_ratio) / rho_mix   # 식(6)+(21)+(22)
 
+    Ixx=[]
+    etaxx=[0.05,0.075,0.1,0.15,0.2,0.25,0.3]
+    sxx=[]
+
+    sc_backup=sc.x.array.copy()
+    for etas in etaxx:
+
+        etaloop=Constant(domain,default_scalar_type(etas))
+
+        bb=ufl.exp(F*etaloop/(R*T))
+        I_currr=(1-s)*I_ref*(C_O2/0.21)*bb
+
+        water_gen_fluxx = I_currr/(2*F)*(1+2*alp)*MH2O     
+        O2_consum_fluxx = -(I_currr/(4*F))*MO2 
+
+        F_s = (
+             rho_mix * dot(gamma_H2O*u_sol, grad(C_H2O)) * vs * dx
+            + (1 - rv_ratio) * D_cap * dot(grad(s), grad(vs)) * dx
+            + water_gen_fluxx * vs * ds_measure(13)
+        )
+
+
+        F_C = (
+              rho_mix * dot(gamma_O2*u_sol, grad(C_O2)) * v_CO2 * dx
+            + epsilon*rhoAir*DgO2*(1-s) * dot(grad(C_O2), grad(v_CO2)) * dx
+            - D_cap * C_O2 * dot(grad(s), grad(v_CO2)) * dx
+            + O2_consum_fluxx * v_CO2 * ds_measure(13)
+        )
+
+
+        F_total = F_s + F_C
+
+        problem2 = NonlinearProblem(
+            F_total, sc, bcs=bcsO2,
+            petsc_options_prefix=f"o2sat_{theta}_",
+            petsc_options={
+                "snes_type": "newtonls",
+                "snes_rtol": 1e-8,
+                "snes_max_it": 50,
+                "snes_linesearch_type": "bt",
+                "ksp_type": "preonly",
+                "pc_type": "lu",
+                "pc_factor_mat_solver_type": "mumps",
+            },
+        )
+
+        #problem2.solver.setVariableBounds(lb.x.petsc_vec, ub.x.petsc_vec) 
+        problem2.solve()
+
+        reason = problem2.solver.getConvergedReason()
+        iters  = problem2.solver.getIterationNumber()
+
+        if MPI.COMM_WORLD.rank==0:
+            print(f'At eta {etas}V')
+            print(f"theta={theta}: converged reason={reason}, iterations={iters}")
+
+        s_sol = sc.sub(0).collapse()
+        C_sol = sc.sub(1).collapse()
+        s_sol.name = f"saturation_theta{theta}"
+        C_sol.name = f"O2_conc_theta{theta}"
+
+        results[theta] = (s_sol, C_sol)
+
+
+
+        Iform=form((I_currr/L)*ds_measure(13))
+        I_avg=fem.assemble_scalar(Iform)
+        Ixx.append(I_avg)
+
+        eta_ohm=I_avg*(H1.value)/10 #.. $\sigma _m$ 이온전도도 일단 10으로...
+
+        V=V_oc.value-etas-eta_ohm
+        
+        if MPI.COMM_WORLD.rank==0:
+
+            print(f"  s range: [{s_sol.x.array.min():.4f}, {s_sol.x.array.max():.4f}]")
+            print(f"  C range: [{C_sol.x.array.min():.4f}, {C_sol.x.array.max():.4f}]")
+            print(f'{theta} Average I  ,{I_avg}')
+            print(f'{theta} voltage {V}...')
+
+        sxx.append(s_sol.x.array.max())
+
+
+
+        if etas==0.3:
+
+            with VTXWriter(domain.comm, "/home/ss/ChemFrontier/results/etaS.bp", [s_sol]) as vtx:
+                vtx.write(0.0)
+            with VTXWriter(domain.comm, "/home/ss/ChemFrontier/results/etaC.bp", [C_sol]) as vtx:
+                vtx.write(0.0)
+
+
+    if MPI.COMM_WORLD.rank==0:
+        plt.figure()
+        plt.plot(Ixx,etaxx)
+        plt.title("OverPotential and Current density")
+        plt.xlabel("Current denstiy ")
+        plt.ylabel("Over Potential ")
+        plt.savefig('/home/ss/ChemFrontier/etaandI.png')
+        plt.show()
+
+        plt.figure()
+        plt.plot(Ixx,sxx)
+        plt.title("maxsaturation and Current density")
+        plt.xlabel("Current denstiy ")
+        plt.ylabel("Saturation ")
+        plt.savefig('/home/ss/ChemFrontier/smaxandI.png')
+        plt.show()
+
+
+        print('ssssss')
+ 
+    break
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    aa=ufl.exp(F*eta/(R*T))
+    I_curr=(1-s)*I_ref*(C_O2/0.21)*aa
+
+
     # ---- CL 계면(태그13) 반응 flux ----
     water_gen_flux = -I_curr/(2*F)*(1+2*alp)*MH2O     # 식(25)/(26) 기반, 물 생성
     O2_consum_flux = (I_curr/(4*F))*MO2                # 식(35) 기반, 산소 소모
+
 
     # ---- F_s: 식(23) 기반 발산형 ----
     F_s = (
@@ -266,6 +447,7 @@ for theta in [91, 100, 110, 120]:
         - O2_consum_flux * v_CO2 * ds_measure(13)
     )
 
+
     F_total = F_s + F_C
 
     problem2 = NonlinearProblem(
@@ -280,6 +462,8 @@ for theta in [91, 100, 110, 120]:
             "pc_factor_mat_solver_type": "mumps",
         },
     )
+
+    '''
     problem2.solve()
 
     reason = problem2.solver.getConvergedReason()
@@ -293,15 +477,28 @@ for theta in [91, 100, 110, 120]:
 
     results[theta] = (s_sol, C_sol)
 
+
+
+    Iform=form((I_curr/L)*ds_measure(13))
+    I_avg=fem.assemble_scalar(Iform)
+
+    eta_ohm=I_avg*(H1.value+dH.value)/10 #.. $\sigma _m$ 이온전도도 일단 10으로...
+
+    V=V_oc.value-eta.value-eta_ohm
+  
+
     print(f"  s range: [{s_sol.x.array.min():.4f}, {s_sol.x.array.max():.4f}]")
     print(f"  C range: [{C_sol.x.array.min():.4f}, {C_sol.x.array.max():.4f}]")
 
+    print(f'{theta} Average I  ,{I_avg}')
+    print(f'{theta} voltage {V}...')
 
     if theta==91:
         with VTXWriter(domain.comm, "/home/ss/ChemFrontier/results/sss912.bp", [s_sol]) as vtx:
             vtx.write(0.0)
         with VTXWriter(domain.comm, "/home/ss/ChemFrontier/results/CCC912.bp", [C_sol]) as vtx:
             vtx.write(0.0)
+
 
 
     elif theta==100:
@@ -321,79 +518,76 @@ for theta in [91, 100, 110, 120]:
             vtx.write(0.0)
         with VTXWriter(domain.comm, "/home/ss/ChemFrontier/results/CCC1202.bp", [C_sol]) as vtx:
             vtx.write(0.0)
+    '''
 
+if MPI.COMM_WORLD.rank==0:
+    H1_val = 1e-3
+    dH_val = 3e-4
+    L_val  = 0.05
 
-H1_val = 1e-3
-dH_val = 3e-4
-L_val  = 0.05
+    n_y = 60      # y방향(GDL 두께) 샘플 개수
+    n_x = 80      # x방향(채널길이) 평균낼 샘플 개수
 
-n_y = 60      # y방향(GDL 두께) 샘플 개수
-n_x = 80      # x방향(채널길이) 평균낼 샘플 개수
+    y_coords = np.linspace(H1_val, H1_val + dH_val, n_y)
+    x_coords = np.linspace(0.0005, L_val - 0.0005, n_x)  # 양끝 살짝 안쪽
 
-y_coords = np.linspace(H1_val, H1_val + dH_val, n_y)
-x_coords = np.linspace(0.0005, L_val - 0.0005, n_x)  # 양끝 살짝 안쪽
+    from dolfinx.geometry import bb_tree, compute_collisions_points, compute_colliding_cells
 
-from dolfinx.geometry import bb_tree, compute_collisions_points, compute_colliding_cells
+    tree = bb_tree(domain, domain.topology.dim)
 
-tree = bb_tree(domain, domain.topology.dim)
+    def sample_and_average(field, y_coords, x_coords):
+        """각 y값마다 x방향으로 평균낸 1D 배열 반환"""
+        eta_list = []
+        avg_list = []
+        for y in y_coords:
+            points = np.array([[x, y, 0.0] for x in x_coords])
+            cell_candidates = compute_collisions_points(tree, points)
+            colliding_cells = compute_colliding_cells(domain, cell_candidates, points)
 
-def sample_and_average(field, y_coords, x_coords):
-    """각 y값마다 x방향으로 평균낸 1D 배열 반환"""
-    eta_list = []
-    avg_list = []
-    for y in y_coords:
-        points = np.array([[x, y, 0.0] for x in x_coords])
-        cell_candidates = compute_collisions_points(tree, points)
-        colliding_cells = compute_colliding_cells(domain, cell_candidates, points)
+            vals = []
+            for i, point in enumerate(points):
+                links = colliding_cells.links(i)
+                if len(links) > 0:
+                    v = field.eval(point.reshape(1,3), [links[0]])
+                    vals.append(v.flatten()[0])
 
-        vals = []
-        for i, point in enumerate(points):
-            links = colliding_cells.links(i)
-            if len(links) > 0:
-                v = field.eval(point.reshape(1,3), [links[0]])
-                vals.append(v.flatten()[0])
+            if len(vals) > 0:
+                avg_list.append(np.mean(vals))
+                eta_list.append((y - H1_val) / dH_val)
 
-        if len(vals) > 0:
-            avg_list.append(np.mean(vals))
-            eta_list.append((y - H1_val) / dH_val)
+        return np.array(eta_list), np.array(avg_list)
 
-    return np.array(eta_list), np.array(avg_list)
+    C_in_val = 0.21
 
-C_in_val = 0.21
+    fig1, ax1 = plt.subplots(figsize=(6,5))
+    fig2, ax2 = plt.subplots(figsize=(6,5))
 
-fig1, ax1 = plt.subplots(figsize=(6,5))
-fig2, ax2 = plt.subplots(figsize=(6,5))
+    for theta, (s_sol, C_sol) in results.items():
+        eta_s, s_avg = sample_and_average(s_sol, y_coords, x_coords)
+        eta_C, C_avg = sample_and_average(C_sol, y_coords, x_coords)
 
-for theta, (s_sol, C_sol) in results.items():
-    eta_s, s_avg = sample_and_average(s_sol, y_coords, x_coords)
-    eta_C, C_avg = sample_and_average(C_sol, y_coords, x_coords)
+        ax1.plot(eta_s, s_avg, label=f"θc={theta}°")
+        ax2.plot(eta_C, C_avg / C_in_val, label=f"θc={theta}°")
 
-    ax1.plot(eta_s, s_avg, label=f"θc={theta}°")
-    ax2.plot(eta_C, C_avg / C_in_val, label=f"θc={theta}°")
+    ax1.set_xlabel(r"$(y-H_1)/(H_2-H_1)$")
+    ax1.set_ylabel(r"$s$ (xaverage)")
+    ax1.set_title("Liquid water saturation across GDL (x-averaged)")
+    ax1.legend()
+    ax1.grid(alpha=0.3)
 
-ax1.set_xlabel(r"$(y-H_1)/(H_2-H_1)$")
-ax1.set_ylabel(r"$s$ (xaverage)")
-ax1.set_title("Liquid water saturation across GDL (x-averaged)")
-ax1.legend()
-ax1.grid(alpha=0.3)
+    ax2.set_xlabel(r"$(y-H_1)/(H_2-H_1)$")
+    ax2.set_ylabel(r"$C_{O_2,g}/C_{O_2,g,in}$ (x average)")
+    ax2.set_title("Oxygen concentration across GDL (x-averaged)")
+    ax2.legend()
+    ax2.grid(alpha=0.3)
 
-ax2.set_xlabel(r"$(y-H_1)/(H_2-H_1)$")
-ax2.set_ylabel(r"$C_{O_2,g}/C_{O_2,g,in}$ (x average)")
-ax2.set_title("Oxygen concentration across GDL (x-averaged)")
-ax2.legend()
-ax2.grid(alpha=0.3)
+    fig1.savefig("/home/ss/ChemFrontier/results/fig2_saturation_avg2.png", dpi=150, bbox_inches="tight")
+    fig2.savefig("/home/ss/ChemFrontier/results/fig3_oxygen_avg2.png", dpi=150, bbox_inches="tight")
 
-fig1.savefig("/home/ss/ChemFrontier/results/fig2_saturation_avg2.png", dpi=150, bbox_inches="tight")
-fig2.savefig("/home/ss/ChemFrontier/results/fig3_oxygen_avg2.png", dpi=150, bbox_inches="tight")
+    print("그래프 저장 완료: fig2_saturation_avg.png, fig3_oxygen_avg.png")
 
-print("그래프 저장 완료: fig2_saturation_avg.png, fig3_oxygen_avg.png")
-
-
-
-
-
-
-
+    end=time.time()
+    print(f'runtime{end-start}')
 
 
 
@@ -404,5 +598,11 @@ print("그래프 저장 완료: fig2_saturation_avg.png, fig3_oxygen_avg.png")
 
 
 
-end=time.time()
-print(f'runtime{end-start}')
+
+
+
+
+
+
+
+
