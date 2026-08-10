@@ -40,6 +40,7 @@ The model describes two-phase transport of gas and liquid water in the cathode G
 Primary unknowns:
 
 $$
+
 \mathbf{w}
 =
 \left(
@@ -47,6 +48,7 @@ $$
 C_{H_2O},\;
 C_{O_2,g}
 \right)
+
 $$
 
 - $\hat p$ : mixture pressure
