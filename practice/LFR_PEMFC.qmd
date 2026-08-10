@@ -1,0 +1,131 @@
+---
+title: "HFR 이용 PEFMFC flooding 감지 "
+author: "Real-time detection of flooding in PEMFC(polymer electrolyte membrane fuel cells) using high-frequency electrochemical impedance"
+format:
+  revealjs:
+    theme: default      
+    slide-number: true  
+    embed-resources: true 
+---
+
+## 기존 기술의 한계
+:::: {.columns}
+::: { style="font-size: 70%;"}
+전압/전류 모니터링: 전압이 떨어지는 원인이 플러딩 때문인지, 전해질막 건조(Dehydration)나 수소 크로스오버 때문인지 구별하기 어려움<br><br>
+중성자/MRI 영상: 장비가 너무 고가이고 복잡해 상용화하기 불가능<br><br>
+차압(Pressure Drop) 측정: 민감한 세포 전압 변동에 대해 즉각적으로 반응 못 함  <br><br>
+전기화학 임피던스 분광법(EIS): 손실 원인을 분리하는 데는 유용하지만, 측정에 시간이 너무 오래 걸려 실시간 제어가 불가능
+<br><br>
+**본 연구의 제안** <br>
+기존 연구들은 고주파 저항(HFR)을 Membrane Hydration
+을 간접 측정하는 지표로만 사용. 하지만 전해질막 수분은 건조한 상태에서도 천천히 줄어들기 때문에, 순간적으로 발생하는 플러딩을 진단하기엔 정확도가 떨어짐<br>
+**연구 차별점** 
+<br>
+본 연구에서는 HFR의 '실시간 변동 패턴(HFR Fluctuations)'을 분석하여, 플러딩을 직접적이고 실시간으로, 그리고 기존 저주파 저항(LFR) 방식보다 훨씬 빠르게 진단
+:::
+::::
+
+
+## 실험 방법
+:::: {.columns}
+::: {.column width="50%" style="font-size: 70%;"}
+**Single Cell 및 MEA 제작**<br>
+- 촉매 코팅 막(CCM) 방식으로 제작<br>
+- $5\,\text{cm}^2$ 면적에 백금 용량 $0.12\,\text{mg}_{\text{Pt}}/\text{cm}^2$ 코팅<br>
+- 가스확산층(GDL): Sigracet 36BB (두께 $280\,\mu\text{m}$)<br>
+- 싱글 서펜타인 채널 유로판 조합
+:::
+
+::: {.column width="50%" style="font-size: 70%;"}
+**실험 장치 구성**<br>
+- 가습기, MFC, Line Heater를 통한 온/습도 및 유량 제어<br>
+- Electrochemical Workstation을 통한 실시간 HFR/LFR 모니터링
+:::
+:::: 
+![](ch_images/LFR_PEMFC_Fig1.png){width="100%" fig-align="center"}
+
+
+
+## 실험 방법 
+:::: {.columns}
+::: {.column width="50%" style="font-size: 65%;"}
+1. **일반 운전 모드 (Normal Operation Mode):**
+- 실제 수소차 운전 환경과 유사하게 설정
+- 전압 $0.6\,\text{V}$, 셀 온도 $80^\circ\text{C}$, 상대습도(RH) 100%, 배압 $1\text{bar}$.  
+- 가스 공급 방식은 '고정 유량(Fixed Flow)'과 '양론비(Stoichiometric Ratio)' 두 가지로 나누어 실험\
+:::
+
+::: {.column width="50%" style="font-size: 65%;"}
+2. **응축 모드 (Condensation Mode):**
+- 스택 내부에서 국소적인 온도 저하로 가스가 액체 물로 응축되어 플러딩이 발생하는 극단적 상황을 모사
+- 셀 온도는 $80^\circ\text{C}$로 유지하되, 라인 히터 온도를 $30^\circ\text{C}$로 낮추어 강제로 수증기 응축(액체 물 유입)을 일으킴
+:::
+::::
+![](ch_images/LFR_PEMFC_table1.png){width="100%" fig-align="center"}
+
+
+## 일반 운전 모드 플러딩 진단{.smaller}
+:::: {.columns}
+::: {.column width="50%" style="font-size: 80%;"}
+**주파수 선정 (Pilot EIS Test)**
+$0.6\,\text{V}$ 전압 조건에서 EIS를 측정한 결과, 저주파 영역($0.01 \sim 1\,\text{Hz}$)에서는 배출되지 못한 물 때문에 데이터가 불규칙하게 튀는(Scattered) 현상<br> <br> 
+따라서 저주파 지표로는 $1\,\text{Hz}$를, 고주파 지표(HFR)로는 허수부(Imaginary part)가 0에 가깝고 고주파 영역에서 안정적인 $1500\,\text{Hz}$를 최종 스캐닝 주파수로 선정<br> <br> 
+주파수가 $1500,\text{Hz}$처럼 매우 높아지면, 반응물이 확산하거나 커패시터가 충전될 시간이 없어 허수부($-Z_{\text{imag}}$) 값이 **0에 가까워지고, x축(실수부)의 순수 저항 값인 HFR(High-Frequency Resistance)만 깔끔하게 측정 가능<br> <br> 
+:::
+
+::: {.column width="50%" style="font-size: 80%;"}
+**실시간 플러딩 반응 모니터링 (HFR vs LFR)**<br><br>
+- **LFR ($1\,\text{Hz}$):** 전류가 급감하는 심각한 플러딩 상황에서만 뾰족하게 상승. 미세하거나 점진적인 수분 축적에는 전혀 반응하지 않았으며, 진단 정확도는 77.2%<br><br>
+- **HFR ($1500\,\text{Hz}$):** 플러딩 발생 전 단계부터 완화 단계까지 100% 진단 정확도
+<br>
+![](ch_images/LFR_PEMFC_Fig2.png)
+:::
+::::
+
+## 일반 운전 모드 플러딩 진단{.smaller}
+![](ch_images/LFR_PEMFC_Fig3.png){width="50%" fig-align="center"}
+![](ch_images/LFR_PEMFC_Fig4.png){width="50%" fig-align="center"}
+
+
+
+
+## HFR의 플러딩 주기 패턴 메커니즘{.smaller}
+:::: {.columns}
+::: {.column width="50%" style="font-size: 80%;"}
+### 4단계 사이클
+1. **정상 상태 (Phase 1):** 가스와 수증기가 촉매층으로 원활히 공급되어 전류가 높고 HFR이 낮음.  
+2. **초기 점진적 플러딩 (Phase 2):** 응축수와 생성수가 GDL에 차오르기 시작함 ➔ **HFR 서서히 증가**.  
+3. **말기 점진적 플러딩 (Phase 3):** 수분 누적으로 기공이 줄어들어 가스 압력이 높아지고, HFR이 지속적으로 상승함. 
+4. **심각한 플러딩 및 완화 (Phase 4):** 촉매층 전체가 물로 덮임 ➔ **HFR 급격히 피크 상승**. <br>이후 한계 압력에 도달한 가스가 축적된 물을 유로로 불어내면서 ➔ **HFR 급격히 감소**, 전류 회복.  
+:::
+
+::: {.column width="50%" style="font-size: 80%;"}
+### **응답 속도 비교**
+<br>
+LFR 변동은 전류 밀도 변화보다 평균 **0.927초** 먼저 반응했습니다.  
+<br>
+HFR 변동은 전류 밀도 변화보다 평균 **3.01초**나 먼저 선행하여 반응했습니다.  
+<br>
+즉, HFR을 모니터링하면 성능 저하(전류 감소)가 오기 약 3초 전에 플러딩을 미리 예측 가능
+:::
+::::
+
+
+
+## 응축 모드 플러딩 진단{.smaller}
+:::: {.columns}
+### **라인 히터 $30^\circ\text{C}$ 냉각 실험:**
+<br>
+**Anode(양극) 응축:** 수소의 빠른 확산계수($0.548\,\text{cm}^2/\text{s}$) 덕분에 물이 막아도 반응이 비교적 원활하여, 플러딩 발생 후 평균 350초 만에 완화됨. 
+<br><br>
+**Cathode(음극) 응축:** 산소의 확산계수($0.142\,\text{cm}^2/\text{s}$)가 낮아 축적된 물을 통과하기 어려움 ➔ 플러딩 지속 시간이 평균 800초로 양극보다 **2.3배 길어졌으며**, HFR 절댓값이 $203.8\,\text{m}\Omega\cdot\text{cm}^2$까지 크게 상승.<br>  
+**결론:** 극단적인 가스 응축 환경에서도 HFR 변동 패턴의 크기와 지속 시간을 통해 플러딩의 심각도와 위치를 명확히 진단할 수 있음을 입증. 
+::::
+
+
+
+## 결론 (Conclusions){.smaller}
+1. 높은 진단 정확도와 빠른 반응성: HFR 변동 분석은 100%의 진단 정확도를 나타내며, 성능 저하 발생 약 3초 전에 플러딩을 예측
+2. 동적 플러딩 추적: LFR과 달리, HFR 패턴을 분석하면 '점진적 플러딩 ➔ 심각한 플러딩 ➔ 플러딩 완화/배출'의 전체 동적 사이클을 실시간으로 관찰 가능  
+3. 상태 동시 진단 가능성: 전해질막 건조는 HFR이 단조 증가하는 경향을 보이는 반면, 플러딩은 HFR이 주기적으로 오르내리는 변동 패턴.<br>  
+➔ 이를 이용해 플러딩과 막 건조 현상을 동시에 명확히 구분하여 진단 가능
