@@ -44,7 +44,7 @@ import time
 start=time.time()
 
 
-meshdata=gmshio.read_from_msh('/home/ss/ChemFrontier/Cathode2.msh',MPI.COMM_WORLD,0,2)
+meshdata=gmshio.read_from_msh('/home/ss/ChemFrontier/Cathode3.msh',MPI.COMM_WORLD,0,2)
 domain=meshdata.mesh
 
 cell_tags=meshdata.cell_tags
@@ -168,7 +168,8 @@ bcs = [bc_inlet, bc_wall,bc_outlet,bc_GDL,bc_up]
 w.sub(0).interpolate(lambda x: np.vstack((np.full(x.shape[1], 0.4), np.zeros(x.shape[1]))),cells0=channeltag)
 
 
-rhoAir = Pc*MO2/(R*T)  
+rhoAir = Pc*Mair/(R*T)  
+rhoO2=Pc*MO2/(R*T)
 
 ds_measure = ufl.Measure("ds", domain=domain, subdomain_data=facet_tags)
 
@@ -237,7 +238,7 @@ Fu=(
     + nuAir * inner(grad(u), grad(v)) * dx      # 점성항
     - p * div(v) * dx                           # 압력-속도 커플링
     + q * div(u) * dx                           # 연속방정식 (필수, 이전에 빠졌던 부분)
-    + darcy_switch * (muAir/K) * dot(u, v) * dx # GDL Darcy 저항 소스텀
+    + darcy_switch * (nuAir/K) * dot(u, v) * dx # GDL Darcy 저항 소스텀
 )
 
 
@@ -248,28 +249,38 @@ n = ufl.FacetNormal(domain)
 # ---- Tafel 전류 (논문 식 3.5) ----
 # alpc를 써야 함 (alp=0.5는 anodic 쪽), CO2_in Function 대신 상수 기준농도 사용
 CO2_ref = Constant(domain, default_scalar_type(0.21))
-I = (1 - s) * I_ref * (C / CO2_ref) * ufl.exp(alpc * F * eta / (R * T))
+
+C_smooth_eps = 1e-8   # CO2_ref=0.21 대비 작은 값, 필요시 조정
+C_pos = 0.5*(C + ufl.sqrt(C**2 + C_smooth_eps**2))
+
+
+I = (1 - s) * I_ref * (C_pos / CO2_ref) * ufl.exp(alpc * F * eta / (R * T))
 
 # ---- 아웃렛 클리핑 (논문 §5.2.1 핵심 stabilization) ----
 u_n = dot(u, n)
 u_n_out = ufl.conditional(ufl.gt(u_n, 0), u_n, 0)   # max(u·n, 0), 역류 시 0으로 클리핑
 
 # ============ 물/포화도 수송 (식 3.2 구조, s가 1차 미지수) ============
-water_diff_flux = D_cap * grad(s)
-water_conv_flux = gamma_H2O * rho_mix * u 
+#water_diff_flux = D_cap * grad(s)
+water_conv_flux = gamma_H2O * rho_mix * u *CW
 
 DgH2O = Constant(domain, default_scalar_type(2.56e-5))   # 수증기-공기 확산계수, m^2/s
 
-water_diff_flux = epsilon*(1 - s)*DgH2O*grad(CW) + D_cap*grad(s)
+dCw = 1e-6
+ds_dCw = (s_expr(CW + dCw) - s_expr(CW - dCw)) / (2*dCw)
+
+D_eff_w = epsilon*(1 - s)*DgH2O + D_cap*ds_dCw
+water_diff_flux = rho_mix * D_eff_w * grad(CW)
+
 FH2O = (
       dot(water_diff_flux, grad(vW)) * dx
     - dot(water_conv_flux, grad(vW)) * dx
-    + gamma_H2O * rho_mix  * u_n_out * vW * ds_measure(16)
+    + gamma_H2O * rho_mix  * u_n_out * vW *CW* ds_measure(16)
     - (I / (2 * F)) * MH2O * vW * ds_measure(13)
 )
 # ============ 산소 수송 (식 3.3 구조) ============
-O2_diff_flux = DO2 * grad(C)
-O2_conv_flux = gamma_O2 * u * C
+O2_diff_flux = rhoO2*DO2 * grad(C)
+O2_conv_flux = rhoO2*gamma_O2 * u * C
 
 FO2 = (
       dot(O2_diff_flux, grad(vC)) * dx
@@ -293,8 +304,8 @@ Problem=dolfinx.fem.petsc.NonlinearProblem(
     form_compiler_options={"quadrature_degree": 4}, 
     petsc_options={
         "snes_type": "newtonls",
-        "snes_rtol": 1e-5,
-        "snes_atol":1e-5,
+        "snes_rtol": 1e-8,
+        "snes_atol":1e-8,
         "snes_max_it": 50,
         "snes_linesearch_type": "bt",
         "snes_monitor": None,
@@ -333,10 +344,10 @@ def reset_state(eta_start=0.05):
     eta.value = eta_start
 
 
-def run_eta_sweep(eta_max=0.3, d_eta_init=0.01, max_bisect=4):
+def run_eta_sweep(eta_max=0.8, d_eta_init=0.01, max_bisect=4):
     d_eta = d_eta_init
     eta_prev_val = float(eta.value) - 1e-6
-    hist = {"eta": [], "I": [], "s_max": [], "V": []}
+    hist = {"eta": [], "I": [], "s_max": [], "V": [],"C_min":[]}
 
     while float(eta.value) < eta_max:
         eta_target = float(eta.value) + d_eta
@@ -364,16 +375,43 @@ def run_eta_sweep(eta_max=0.3, d_eta_init=0.01, max_bisect=4):
 
         s_proj = Function(V_C)
         s_proj.interpolate(s_expr_compiled)
+
+
+        C_sol=w.sub(2).collapse()
+
         I_avg = domain.comm.allreduce(fem.assemble_scalar(Iform), op=MPI.SUM)
         V_now = V_oc.value - float(eta.value) - (I_avg * float(dH.value)) / sigma_mem.value
 
         if MPI.COMM_WORLD.rank == 0:
-            print(f"  eta={float(eta.value):.4f}  I={I_avg:.3f}  smax={s_proj.x.array.max():.4f}  V={V_now:.3f}", flush=True)
+
+            coords = V_C.tabulate_dof_coordinates()
+
+            idx_min = np.argmin(C_sol.x.array)
+            print("C_min 위치:", coords[idx_min], " 값:", C_sol.x.array[idx_min])
+
+            C_at_CL_avg = fem.assemble_scalar(fem.form(C * ds_measure(13)))
+            CL_length = fem.assemble_scalar(fem.form(1 * ds_measure(13)))
+            print("CL 평균 C:", C_at_CL_avg / CL_length)
+
+            C_at_CL_min = fem.assemble_scalar(fem.form(ufl.conditional(ufl.lt(C,1e10), C, 1e10) * ds_measure(13)))
+            # 또는 DOF 좌표로 직접 필터링
+            coords = V_C.tabulate_dof_coordinates()
+            C_sol = w.sub(2).collapse()
+            cl_mask = np.isclose(coords[:,1], 0.0012, atol=1e-6)
+            print("CL 위 C 값들 (min/max/mean):", 
+                C_sol.x.array[cl_mask].min(), 
+                C_sol.x.array[cl_mask].max(), 
+                C_sol.x.array[cl_mask].mean())
+
+
+
+            print(f"  eta={float(eta.value):.4f}  I={I_avg:.3f}  smax={s_proj.x.array.max():.4f}  V={V_now:.3f} C_min={C_sol.x.array.min()}" , flush=True)
 
         hist["eta"].append(float(eta.value))
         hist["I"].append(I_avg)
         hist["s_max"].append(float(s_proj.x.array.max()))
         hist["V"].append(V_now)
+        hist["C_min"].append(float(C_sol.x.array.min()))
 
         if V_now < 0:
             break
@@ -381,23 +419,35 @@ def run_eta_sweep(eta_max=0.3, d_eta_init=0.01, max_bisect=4):
     return hist
 
 
-# ================= tau 스윕 (epsilon 고정) =================
-epsilon_fixed = 0.5
-tau_vals = [1.0, 1.5, 2.0, 2.5, 3.0]
+CL_avg_form = form(C * ds_measure(13))
+CL_length_form = form(1 * ds_measure(13))
+CL_len = domain.comm.allreduce(fem.assemble_scalar(CL_length_form), op=MPI.SUM)
 
-results_tau = {}
-epsilon.value = epsilon_fixed
-for tau_v in tau_vals:
-    tau.value = tau_v
-    reset_state(eta_start=0.05)
+epsilon.value = 0.5
+tau.value = 1.1
+reset_state(eta_start=-50)
+Problem.solve()
+
+CL_avg = domain.comm.allreduce(fem.assemble_scalar(CL_avg_form), op=MPI.SUM)
+if MPI.COMM_WORLD.rank == 0:
+    print("CL(y=0.0012) 평균 C:", CL_avg / CL_len, flush=True)
+
+for eta_test in [1e-6, 0.001, 0.01, 0.02, 0.04, 0.06]:
+    eta.value = eta_test
+    Problem.solve()
+    CL_avg = domain.comm.allreduce(fem.assemble_scalar(CL_avg_form), op=MPI.SUM)
     if MPI.COMM_WORLD.rank == 0:
-        print(f"[tau={tau_v}]", flush=True)
-    results_tau[tau_v] = run_eta_sweep(eta_max=0.3)
+        print(f"eta={eta_test}: CL 평균 C = {CL_avg/CL_len}", flush=True)
+
+
+'''
 
 
 # ================= epsilon 스윕 (tau 고정) =================
-tau_fixed = 1.5
-epsilon_vals = [0.3, 0.4, 0.5, 0.6, 0.7]
+tau_fixed = 1.1
+epsilon_vals = [ 0.7]
+
+
 
 results_eps = {}
 tau.value = tau_fixed
@@ -406,22 +456,13 @@ for eps_v in epsilon_vals:
     reset_state(eta_start=0.05)
     if MPI.COMM_WORLD.rank == 0:
         print(f"[epsilon={eps_v}]", flush=True)
-    results_eps[eps_v] = run_eta_sweep(eta_max=0.3)
+    results_eps[eps_v] = run_eta_sweep(eta_max=0.8)
 
 
 end = time.time()
 if MPI.COMM_WORLD.rank == 0:
     print(f'runtime {(end-start)/60:.2f} minute', flush=True)
 
-    plt.figure()
-    for tau_v, hist in results_tau.items():
-        I_cm2 = np.array(hist["I"]) * 1e-4
-        plt.plot(I_cm2, hist["eta"], marker='o', label=f"tau={tau_v}")
-    plt.xlabel("I (A/cm$^2$)")
-    plt.ylabel("eta (V)")
-    plt.title(f"Effect of tortuosity (epsilon={epsilon_fixed})")
-    plt.legend()
-    plt.show()
 
     plt.figure()
     for eps_v, hist in results_eps.items():
@@ -432,3 +473,27 @@ if MPI.COMM_WORLD.rank == 0:
     plt.title(f"Effect of porosity (tau={tau_fixed})")
     plt.legend()
     plt.show()
+
+
+
+    plt.figure()
+    for eps_v, hist in results_eps.items():
+        I_cm2 = np.array(hist["I"]) * 1e-4
+        plt.plot(I_cm2, hist["s_max"], marker='o', label=f"epsilon={eps_v}")
+    plt.xlabel("I (A/cm$^2$)")
+    plt.ylabel("s_max")
+    plt.title(f"Effect of porosity on s_max (tau={tau_fixed})")
+    plt.legend()
+    plt.show()
+
+    plt.figure()
+    for eps_v, hist in results_eps.items():
+        I_cm2 = np.array(hist["I"]) * 1e-4
+        plt.plot(I_cm2, hist["C_min"], marker='o', label=f"epsilon={eps_v}")
+    plt.xlabel("I (A/cm$^2$)")
+    plt.ylabel("Oxygen C_min")
+    plt.title(f"Effect of porosity on Oxyge C_min (tau={tau_fixed})")
+    plt.legend()
+    plt.show()
+
+    '''
